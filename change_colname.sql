@@ -1,0 +1,20 @@
+ALTER TABLE Human_Resources
+RENAME COLUMN C1 TO id,
+RENAME COLUMN C2 TO first_name,
+RENAME COLUMN C3 TO last_name,
+RENAME COLUMN C4 TO birthdate,
+RENAME COLUMN C5 TO gender,
+RENAME COLUMN C6 TO race,
+RENAME COLUMN C7 TO department,
+RENAME COLUMN C8 TO jobtitle,
+RENAME COLUMN C9 TO location,
+RENAME COLUMN C10 TO hire_date,
+RENAME COLUMN C11 TO termdate,
+RENAME COLUMN C12 TO location_city,
+RENAME COLUMN C13 TO location_state;
+
+
+SET SQL_SAFE_UPDATES = 0;
+
+DELETE FROM Human_Resources
+where id='id';
