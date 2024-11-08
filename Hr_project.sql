@@ -1,23 +1,37 @@
+-- 注意：please keep raw_data:hr_raw 原始表格必须保留
+CREATE TABLE Human_Resources AS
+SELECT *
+FROM hr_raw;
+
 -- data cleaning
 
 -- 1.change column name 修改列的名字
-SET SQL_SAFE_UPDATES = 0;
+SET SQL_SAFE_UPDATES = 0;    -- 安全模式先关闭一下
 
 ALTER TABLE Human_Resources
 CHANGE COLUMN id emp_id VARCHAR(20) NULL;
 
--- 2.date transform。 日期整理
-SELECT hire_date from Human_Resources
+-- 2.date transform 日期整理
+-- 原本导入的日期数据是TEXT 类型 
+-- TEXT 类型本质上是字符串类型的一种。它用于存储长文本数据，可以看作是一个特殊的字符串类型。不同点在于：
+-- CHAR 和 VARCHAR：用于存储较短的字符串，CHAR 是固定长度，VARCHAR 是可变长度。
+-- TEXT：用于存储大量的文本数据，比 VARCHAR 支持更长的字符数，适合存放文章、评论或描述等。
 
-SELECT
+-- 是的，你需要两步：首先整理日期格式，然后再更改列的数据类型。这是因为数据库不能自动将不符合日期格式的数据转换为日期类型，所以你需要确保所有的数据格式都正确。
+
+
+SELECT hire_date from Human_Resources;
+
+SELECT 
 	  hire_date,
 	  case 
-		WHEN hire_date LIKE '%/%' THEN STR_TO_DATE(hire_date, '%d/%m/%Y')
+		WHEN hire_date LIKE '%/%' THEN STR_TO_DATE(hire_date, '%d/%m%Y')
 		WHEN hire_date LIKE '%-%' THEN STR_TO_DATE(hire_date, '%d-%m-%Y')
 	end as date_time
-from Human_Resources
-    
--- 为什么上面的version 是错的，因为举个例子，1/20/2022，这很明显是m-d-y的形式，而如果你把这个格式解析为d-m-y，就会有问题啊，怎么会有20月呢？
+	from Human_Resources
+
+-- STR_TO_DATE 是一种 SQL 函数，用于将字符串类型的数据解析并转换为日期格式。
+-- 为什么上面的version 是错的，因为举个例子，1/20/2022:这很明显是m-d-y的形式，而如果你把这个格式解析为d-m-y，就会有问题啊，怎么会有20月呢？
 -- 9/29/2010 这个也是 你解析为了 d-m-y，当然是错的啊
 
 SELECT 
@@ -39,6 +53,9 @@ END;
 -- 如果 hire_date 列的数据类型是 TEXT 或 VARCHAR，即便你用 STR_TO_DATE() 函数成功将字符串转换为日期格式，在更新时它会被存储为字符串，而不是实际的日期格式。
 -- 这就是为什么所有日期都显示为 YYYY-MM-DD 格式（标准的日期字符串格式）。
 
+
+-- VS date_format
+-- DATE_FORMAT() 是用来将日期或日期时间类型数据格式化为字符串，而不是用于改变数据库中存储的日期格式。
 ALTER TABLE Human_Resources MODIFY hire_date DATE;
 
 -- 如果你希望更新后的日期在存储中仍保持原有的分隔符（如 /），那么你应该转换后再重新格式化成字符串
@@ -150,7 +167,7 @@ FROM
 GROUP BY age_group
 ORDER BY age_group;
 
-%%sql
+
 SELECT 
   CASE 
     WHEN age >= 18 AND age <= 24 THEN '18-24'
@@ -241,7 +258,7 @@ order by location_state,location_city,employee_numbers desc
 
 -- 10. How has the company's employee count changed over time based on hire and term dates?
 -- 这个 SQL 查询旨在分析公司在不同时间的员工数量变化，基于员工的入职日期和离职日期。
--- 我自己写的这个-1，1这个代码。会有一个问题，那就是将招聘日期和辞职日期结合起来之后，就会有招聘日期是停留在2020年，而离职日期还会有2024年2027年...之类的
+-- 我自己写的这个-1，1这个代码。会有一个问题，那就是将招聘日期和辞职日期结合之后，就会有招聘日期是停留在2020年，而离职日期还会有2024年2027年...之类的
 -- 那就会导致截止到2024年11 月7 日也就是我查询的今天，会出现后面的2020 2021 2022 2023 2024直邮流出没有流入
 -- 那我就加个条件嘛where 筛选一下时间
 	with tmp1 as 
@@ -296,18 +313,18 @@ GROUP BY
     YEAR(hire_date)
 ORDER BY 
     YEAR(hire_date) ASC;
--- 上面这个做法简直就是打错特错 对于分组后的count作为hires当然是没问题的，terminations的计算方法有问题
+-- 上面这个做法简直就是大错特错 对于分组后的count作为hires当然是没问题的，terminations的计算方法有问题
 -- sum case when那句话统计的是只要比2024年早的离职日期 那就计1 然后加总 ，感觉像是按年加总，实质没有任何分组加总在里面
 -- 会统计所有 termdate 小于等于当前日期的离职记录，而不是与 YEAR(hire_date) 对应的 termdate。
 -- 对于 2000 年的分组，它会统计 2000 年的 hires 数量。但 SUM(CASE WHEN termdate <= CURDATE() THEN 1 ELSE 0 END) 不会只统计 2000 年的 termdate，而是所有 termdate 小于等于 CURDATE() 的记录。
-
+-- 这个 group by 感觉没有很大的作用
 
 SELECT 
     hire_counts.year AS year,
     hires,
     terminations,
     hires - terminations AS net_change,
-    ROUND(((hires - terminations) / hires) * 100, 2) AS net_change_percent
+    ROUND((terminations) / (terminations+hires) * 100, 2) AS termination_rate -- 离职率一直在上升哦 随着年份推进
 FROM (
     SELECT 
         YEAR(hire_date) AS year,
@@ -343,5 +360,7 @@ select department,min(tenure_days),max(tenure_days),avg(tenure_days),min(tenure_
 from tmp1
 group by department
 order by department
+
+
 
 
